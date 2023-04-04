@@ -3,7 +3,7 @@
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME, login as auth_login
 from django.contrib.auth.views import redirect_to_login
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.urls import reverse
 from django.utils.cache import patch_cache_control
 from django.utils.http import is_safe_url, urlquote
@@ -127,6 +127,9 @@ def details(request, slug):
     ]
     language_is_unavailable = request_language not in available_languages
 
+    is_permanent_fallback_redirect = get_cms_setting('REDIRECT_LANGUAGE_PERMANENT')
+    redirect_func = HttpResponsePermanentRedirect if is_permanent_fallback_redirect else HttpResponseRedirect
+
     if language_is_unavailable and not fallback_languages:
         # There is no page with the requested language
         # and there's no configured fallbacks
@@ -144,7 +147,7 @@ def details(request, slug):
         if slug and slug != page_slug and request.path[:len(page_path)] != page_path:
             # The current language does not match its slug.
             # Redirect to the current language.
-            return HttpResponseRedirect(page_path)
+            return redirect_func(page_path)
         # Check if the page has a redirect url defined for this language.
         redirect_url = page.get_redirect(request_language, fallback=False) or ''
         redirect_url = _clean_redirect_url(redirect_url, request_language)
@@ -154,7 +157,7 @@ def details(request, slug):
             toolbar.redirect_url = redirect_url
         elif redirect_url not in own_urls:
             # prevent redirect to self
-            return HttpResponseRedirect(redirect_url)
+            return redirect_func(redirect_url)
 
     # permission checks
     if page.login_required and not request.user.is_authenticated:
